@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from groq import Groq
@@ -11,12 +12,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-GROQ_API_KEY             = os.getenv("GROQ_API_KEY")
-CV_TRUNCATION_LIMIT      = 4000
-MAX_TOKENS               = 2000
-TEMPERATURE              = 0.6
+GROQ_API_KEY        = os.getenv("GROQ_API_KEY")
+CV_TRUNCATION_LIMIT = 4000
+MAX_TOKENS          = 2000
+TEMPERATURE         = 0.6
 
-# Primary model with ordered fallbacks — if one is decommissioned, next is tried
+# Primary model with ordered fallbacks
 MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
@@ -50,11 +51,11 @@ def _build_client() -> Groq:
 
 def _build_suggestion_prompt(cv_text: str) -> str:
     """
-    Build a structured prompt instructing the LLM to analyse the CV
-    and return role suggestions across three tiers.
+    Build a structured prompt that instructs the LLM to return
+    role suggestions as a strict JSON object.
 
     Args:
-        cv_text: Extracted CV text (will be truncated to token-safe length)
+        cv_text: Extracted CV text, truncated to token-safe length
 
     Returns:
         Formatted prompt string
@@ -62,65 +63,39 @@ def _build_suggestion_prompt(cv_text: str) -> str:
     truncated_cv = cv_text[:CV_TRUNCATION_LIMIT]
 
     return f"""
-You are an expert career advisor and recruitment specialist with deep knowledge
-of the job market across all industries.
+You are an expert career advisor and recruitment specialist.
 
-Carefully read the CV below and analyse:
+Carefully analyse the CV below. Consider:
 - All work experience and job titles
-- Technical and soft skills (both stated and implied)
+- Technical and soft skills (stated and implied)
 - Education and qualifications
 - Projects and achievements
-- Industries worked in
 - Transferable skills the candidate may not realise they have
 
-Then suggest job roles in THREE categories.
+Return ONLY a valid JSON object — no preamble, no explanation, no markdown fences.
 
-Use EXACTLY this format for every role so it can be parsed correctly:
+The JSON must follow this exact structure:
+{{
+  "strengths_summary": "3-4 sentences summarising what makes this candidate unique. Reference specific things from their CV.",
+  "roles": [
+    {{
+      "title": "Job Title",
+      "category": "Obvious Match",
+      "reason": "2 sentences explaining why this candidate fits this role.",
+      "salary": "£30,000 – £45,000"
+    }}
+  ]
+}}
 
----
-
-**OBVIOUS ROLES** — Roles they are clearly qualified for right now:
-
-**[Job Title]**
-Why they fit: [2 sentences explaining the fit]
-Salary: [Typical UK salary range e.g. £35,000 – £50,000]
-
-**[Job Title]**
-Why they fit: [2 sentences]
-Salary: [range]
-
-(List 4–5 roles in this section)
-
----
-
-**STRETCH ROLES** — Roles they could move into with minor upskilling:
-
-**[Job Title]**
-Why they fit: [2 sentences]
-To bridge the gap: [1 sentence on what they need to add]
-Salary: [range]
-
-(List 3–4 roles in this section)
-
----
-
-**HIDDEN ROLES** — Surprising roles they probably haven't considered:
-
-**[Job Title]**
-Why they fit: [2 sentences explaining transferable fit]
-What excites employers: [1 sentence]
-Salary: [range]
-
-(List 3–4 roles in this section)
-
----
-
-**KEY STRENGTHS SUMMARY**
-[3–4 sentences summarising what makes this candidate unique. Reference specific things from their CV.]
-
----
-
-Be specific and honest. Do not invent experience. Base everything strictly on the CV below.
+Rules:
+- "category" must be exactly one of: "Obvious Match", "Stretch Role", "Hidden Gem"
+- Include 4-5 Obvious Matches, 3-4 Stretch Roles, 3-4 Hidden Gems
+- "Obvious Match" = roles they are fully qualified for right now
+- "Stretch Role" = roles within reach with minor upskilling
+- "Hidden Gem" = surprising roles their transferable skills suit well
+- Salary must be a realistic UK range in £
+- Do not invent skills or experience not present in the CV
+- Return ONLY the JSON. No other text whatsoever.
 
 **CV:**
 {truncated_cv}
@@ -129,8 +104,10 @@ Be specific and honest. Do not invent experience. Base everything strictly on th
 
 def _call_groq_with_fallback(client: Groq, prompt: str) -> str:
     """
-    Attempt to call Groq using the primary model, falling back to
-    alternatives if the model is unavailable or decommissioned.
+    Attempt Groq API call with automatic model fallback.
+
+    Tries each model in MODELS order. If a model is decommissioned
+    or unavailable, moves to the next automatically.
 
     Args:
         client: Authenticated Groq client
@@ -154,9 +131,8 @@ def _call_groq_with_fallback(client: Groq, prompt: str) -> str:
                         "role": "system",
                         "content": (
                             "You are an expert career advisor. "
-                            "Provide specific, honest, and genuinely useful career guidance. "
-                            "Identify transferable skills and hidden opportunities. "
-                            "Always follow the exact formatting structure requested."
+                            "You return only valid JSON — no preamble, "
+                            "no explanation, no markdown. Pure JSON only."
                         ),
                     },
                     {
@@ -181,26 +157,27 @@ def _call_groq_with_fallback(client: Groq, prompt: str) -> str:
     )
 
 
-def suggest_job_roles(cv_text: str) -> str:
+def suggest_job_roles(cv_text: str) -> tuple[list[dict], str]:
     """
-    Analyse a CV and suggest suitable job roles using Groq LLM.
+    Analyse a CV and return structured role suggestions using Groq LLM.
 
-    Produces three tiers of suggestions:
-    - Obvious roles the candidate is already qualified for
-    - Stretch roles requiring minor upskilling
-    - Hidden roles based on transferable skills they may not have considered
+    Returns roles across three tiers:
+    - Obvious Matches: roles the candidate is fully qualified for
+    - Stretch Roles: roles requiring minor upskilling
+    - Hidden Gems: surprising roles based on transferable skills
 
-    Automatically falls back to alternative models if the primary is unavailable.
+    Automatically falls back to alternative models if the primary fails.
 
     Args:
         cv_text: Extracted text from the user's CV
 
     Returns:
-        Formatted string containing job role suggestions and analysis
+        Tuple of (list of role dicts, strengths summary string)
+        Each role dict has keys: title, category, reason, salary
 
     Raises:
         EnvironmentError: If Groq API key is missing
-        ValueError: If CV text is empty
+        ValueError: If CV text is empty or JSON cannot be parsed
         RuntimeError: If all model attempts fail
     """
     if not cv_text or not cv_text.strip():
@@ -213,7 +190,34 @@ def suggest_job_roles(cv_text: str) -> str:
 
     logger.info("Sending CV to Groq for job role suggestions...")
 
-    suggestions = _call_groq_with_fallback(client, prompt)
+    raw = _call_groq_with_fallback(client, prompt)
 
-    logger.info("Job role suggestions received successfully.")
-    return suggestions
+    # Strip accidental markdown fences if model adds them
+    clean = (
+        raw.strip()
+        .removeprefix("```json")
+        .removeprefix("```")
+        .removesuffix("```")
+        .strip()
+    )
+
+    try:
+        data = json.loads(clean)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parse failed: {e}\nRaw response:\n{raw}")
+        raise ValueError(
+            "Role suggestions were returned in an unexpected format. "
+            "Please try uploading your CV again."
+        ) from e
+
+    roles   = data.get("roles", [])
+    summary = data.get("strengths_summary", "")
+
+    if not roles:
+        raise ValueError(
+            "No roles were returned in the analysis. "
+            "Please try uploading your CV again."
+        )
+
+    logger.info(f"Successfully parsed {len(roles)} roles from Groq response.")
+    return roles, summary

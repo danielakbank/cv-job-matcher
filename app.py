@@ -21,13 +21,11 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-# CUSTOM CSS  —  Remotive-inspired calm palette
-# Teal / slate / soft green / warm off-white
+# CUSTOM CSS
 # ─────────────────────────────────────────────
 
 st.markdown("""
 <style>
-    /* ── Base ── */
     html, body, [class*="css"] {
         font-family: 'Inter', 'Segoe UI', sans-serif;
         background-color: #f0f4f3;
@@ -74,12 +72,32 @@ st.markdown("""
     .bc-step.done   { color: #2d8c72; font-weight: 500; }
     .bc-arrow       { color: #b0ccc7; font-size: 0.75rem; }
 
+    /* ── Strengths summary banner ── */
+    .strengths-banner {
+        background: #f0faf7;
+        border: 1px solid #a8d5c8;
+        border-left: 4px solid #2d8c72;
+        border-radius: 10px;
+        padding: 1.2rem 1.5rem;
+        margin-bottom: 1.5rem;
+        color: #1a3a34;
+        font-size: 0.93rem;
+        line-height: 1.7;
+    }
+    .strengths-banner strong {
+        color: #1a6b5a;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+    }
+
     /* ── Role cards ── */
     .role-card {
         background: #ffffff;
         border: 1.5px solid #c8dbd7;
         border-radius: 12px;
         padding: 1.2rem 1.5rem;
+        margin-top: 0.4rem;
         margin-bottom: 0.8rem;
         transition: border-color 0.2s ease;
     }
@@ -117,44 +135,22 @@ st.markdown("""
         border-color: #2d8c72;
         box-shadow: 0 4px 20px rgba(45,140,114,0.1);
     }
-    .job-title {
-        color: #1a3a34;
-        font-size: 1.1rem;
-        font-weight: 700;
-        margin-bottom: 0.3rem;
-    }
-    .job-meta {
-        color: #5a7b74;
-        font-size: 0.85rem;
-        margin-bottom: 0.8rem;
-    }
-    .job-description {
-        color: #3a5a54;
-        font-size: 0.9rem;
-        line-height: 1.6;
-    }
-    .score-badge {
-        display: inline-block;
-        padding: 0.3rem 0.9rem;
-        border-radius: 20px;
-        font-weight: 700;
-        font-size: 0.85rem;
-        margin-bottom: 0.8rem;
-    }
+    .job-title       { color: #1a3a34; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .job-meta        { color: #5a7b74; font-size: 0.85rem; margin-bottom: 0.8rem; }
+    .job-description { color: #3a5a54; font-size: 0.9rem; line-height: 1.6; }
+
+    .score-badge  { display: inline-block; padding: 0.3rem 0.9rem; border-radius: 20px; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.8rem; }
     .score-high   { background: #dff0eb; color: #1a6b5a; }
     .score-medium { background: #fef3e2; color: #9a6000; }
     .score-low    { background: #fde8e8; color: #9a2020; }
+
     .salary-badge {
-        background: #e4edeb;
-        color: #2d6b5a;
-        padding: 0.2rem 0.7rem;
-        border-radius: 20px;
-        font-size: 0.78rem;
-        font-weight: 600;
-        margin-left: 0.5rem;
+        background: #e4edeb; color: #2d6b5a;
+        padding: 0.2rem 0.7rem; border-radius: 20px;
+        font-size: 0.78rem; font-weight: 600; margin-left: 0.5rem;
     }
 
-    /* ── Analysis dropdown box ── */
+    /* ── Analysis box ── */
     .analysis-box {
         background: #f5fbf9;
         border-left: 4px solid #2d8c72;
@@ -168,27 +164,16 @@ st.markdown("""
 
     /* ── Sidebar ── */
     .step-indicator {
-        display: flex;
-        align-items: center;
-        gap: 0.8rem;
-        padding: 0.7rem 1rem;
-        border-radius: 8px;
-        margin-bottom: 0.5rem;
-        font-size: 0.875rem;
-        font-weight: 600;
+        display: flex; align-items: center; gap: 0.8rem;
+        padding: 0.7rem 1rem; border-radius: 8px;
+        margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 600;
     }
     .step-complete { background: #dff0eb; color: #1a6b5a; }
     .step-pending  { background: #eef3f2; color: #8aada7; }
-    .stat-card {
-        background: #ffffff;
-        border: 1px solid #c8dbd7;
-        border-radius: 10px;
-        padding: 1rem;
-        text-align: center;
-        margin-bottom: 0.5rem;
-    }
-    .stat-number { font-size: 1.8rem; font-weight: 800; color: #2d8c72; }
-    .stat-label  { font-size: 0.78rem; color: #6a9b94; margin-top: 0.2rem; }
+
+    .stat-card     { background: #ffffff; border: 1px solid #c8dbd7; border-radius: 10px; padding: 1rem; text-align: center; margin-bottom: 0.5rem; }
+    .stat-number   { font-size: 1.8rem; font-weight: 800; color: #2d8c72; }
+    .stat-label    { font-size: 0.78rem; color: #6a9b94; margin-top: 0.2rem; }
 
     /* ── Empty state ── */
     .empty-state       { text-align: center; padding: 3rem 1rem; color: #7a9e97; font-size: 1rem; }
@@ -206,16 +191,16 @@ st.markdown("""
 # ─────────────────────────────────────────────
 
 def initialise_session_state() -> None:
+    """Initialise all session state variables on first run."""
     defaults = {
-        "cv_text":          None,
-        "parsed_roles":     [],
-        "selected_roles":   [],
-        "scored_jobs":      [],
-        "selected_job":     None,
-        "analysis":         None,
-        "app_stage":        "upload",
-        "search_country":   "gb",
-        "results_per_role": 5,
+        "cv_text":           None,
+        "parsed_roles":      [],
+        "strengths_summary": "",
+        "selected_roles":    [],
+        "scored_jobs":       [],
+        "app_stage":         "upload",
+        "search_country":    "gb",
+        "results_per_role":  5,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -238,22 +223,24 @@ STAGE_LABELS = {
 
 
 def go_to(stage: str) -> None:
+    """Navigate to a specific stage and trigger a rerun."""
     st.session_state.app_stage = stage
     st.rerun()
 
 
 def go_back() -> None:
+    """Navigate to the previous stage."""
     idx = STAGES.index(st.session_state.app_stage)
     if idx > 0:
         go_to(STAGES[idx - 1])
 
 
 def render_breadcrumb() -> None:
-    current = st.session_state.app_stage
-    # Keep breadcrumb to the 3 main screens only (analysis is inline now)
+    """Render a breadcrumb bar showing current position in the flow."""
+    current       = st.session_state.app_stage
     current_index = STAGES.index(current) if current in STAGES else len(STAGES)
+    parts         = []
 
-    crumbs, parts = [], []
     for i, stage in enumerate(STAGES):
         label = STAGE_LABELS[stage]
         if i < current_index:
@@ -276,22 +263,25 @@ def render_breadcrumb() -> None:
 
 
 # ─────────────────────────────────────────────
-# HELPERS
+# PURE HELPERS
 # ─────────────────────────────────────────────
 
 def get_score_class(score: float) -> str:
+    """Return CSS class based on match score threshold."""
     if score >= 70: return "score-high"
     if score >= 45: return "score-medium"
     return "score-low"
 
 
 def get_score_label(score: float) -> str:
+    """Return human-readable label based on match score."""
     if score >= 70: return "Strong Match"
     if score >= 45: return "Partial Match"
     return "Weak Match"
 
 
 def format_salary(job: dict) -> str:
+    """Format salary range string from job dictionary."""
     lo, hi = job.get("salary_min"), job.get("salary_max")
     if lo and hi: return f"£{int(lo):,} – £{int(hi):,}"
     if lo:        return f"From £{int(lo):,}"
@@ -299,50 +289,12 @@ def format_salary(job: dict) -> str:
     return "Salary not listed"
 
 
-def parse_roles_from_suggestions(raw: str) -> list[dict]:
-    roles, current_category = [], "Suggested"
-    category_map = {
-        "OBVIOUS": "Obvious Match",
-        "STRETCH": "Stretch Role",
-        "HIDDEN":  "Hidden Gem",
-    }
-    lines, i = raw.splitlines(), 0
-    while i < len(lines):
-        line = lines[i].strip()
-        for key, label in category_map.items():
-            if key in line.upper():
-                current_category = label
-                break
-        if line.startswith("**") and line.endswith("**") and len(line) > 4:
-            title = line.strip("* ").strip()
-            if any(s in title for s in ["£", "Salary", "Summary", "Roles", "Tips"]):
-                i += 1
-                continue
-            reason_lines, salary, j = [], "Salary not listed", i + 1
-            while j < len(lines) and j < i + 6:
-                nxt = lines[j].strip()
-                if nxt.startswith("**") and nxt.endswith("**"): break
-                if "£" in nxt or "salary" in nxt.lower():
-                    salary = nxt.strip("- •*").strip()
-                elif nxt and not nxt.startswith("#"):
-                    reason_lines.append(nxt.strip("- •*").strip())
-                j += 1
-            if title:
-                roles.append({
-                    "title":    title,
-                    "category": current_category,
-                    "reason":   " ".join(reason_lines[:2]).strip() or "Matches your background.",
-                    "salary":   salary,
-                })
-        i += 1
-    return roles
-
-
 # ─────────────────────────────────────────────
 # SIDEBAR
 # ─────────────────────────────────────────────
 
 def render_sidebar() -> None:
+    """Render sidebar with progress tracker and live stats."""
     with st.sidebar:
         st.markdown("## 🎯 CV Job Matcher")
         st.markdown("*AI-powered career guidance*")
@@ -350,9 +302,9 @@ def render_sidebar() -> None:
 
         st.markdown("### Progress")
         steps = [
-            ("📄 Upload CV",   st.session_state.cv_text is not None),
-            ("💡 Pick Roles",  len(st.session_state.selected_roles) > 0),
-            ("💼 View Jobs",   len(st.session_state.scored_jobs) > 0),
+            ("📄 Upload CV",  st.session_state.cv_text is not None),
+            ("💡 Pick Roles", len(st.session_state.selected_roles) > 0),
+            ("💼 View Jobs",  len(st.session_state.scored_jobs) > 0),
         ]
         for label, complete in steps:
             css  = "step-complete" if complete else "step-pending"
@@ -386,6 +338,7 @@ def render_sidebar() -> None:
 # ─────────────────────────────────────────────
 
 def render_header() -> None:
+    """Render the branded page header."""
     st.markdown("""
         <div class="main-header">
             <h1>🎯 CV Job Matcher</h1>
@@ -399,6 +352,7 @@ def render_header() -> None:
 # ─────────────────────────────────────────────
 
 def render_upload_stage() -> None:
+    """Screen 1: Upload CV, extract text, auto-generate role suggestions."""
     st.markdown("### 📄 Upload Your CV")
 
     uploaded_file = st.file_uploader(
@@ -418,6 +372,7 @@ def render_upload_stage() -> None:
         """, unsafe_allow_html=True)
         return
 
+    # Extract CV text
     with st.spinner("📖 Reading your CV..."):
         try:
             cv_text = extract_cv_text(uploaded_file)
@@ -436,15 +391,22 @@ def render_upload_stage() -> None:
     st.session_state.cv_text = cv_text
     st.success(f"✅ CV uploaded — {len(cv_text.split()):,} words extracted.")
 
+    # Auto-generate role suggestions
     with st.spinner("🤖 Analysing your CV and identifying matching roles..."):
         try:
-            raw    = suggest_job_roles(cv_text)
-            parsed = parse_roles_from_suggestions(raw)
-            st.session_state.parsed_roles = parsed
-            logger.info(f"Parsed {len(parsed)} roles.")
+            roles, summary = suggest_job_roles(cv_text)
+            st.session_state.parsed_roles      = roles
+            st.session_state.strengths_summary = summary
+            logger.info(f"Parsed {len(roles)} roles successfully.")
+        except ValueError as e:
+            st.error(str(e))
+            return
+        except RuntimeError as e:
+            st.error(str(e))
+            return
         except Exception as e:
-            logger.error(f"Role suggestion failed: {e}")
-            st.error("CV uploaded but role analysis failed. Please try again.")
+            st.error(f"Role analysis failed: {e}")
+            logger.error(f"Role suggestion error: {e}")
             return
 
     go_to("select_roles")
@@ -455,9 +417,20 @@ def render_upload_stage() -> None:
 # ─────────────────────────────────────────────
 
 def render_role_selection_stage() -> None:
+    """Screen 2: Display AI-suggested roles. User selects which to explore."""
     st.markdown("### 💡 Roles You're Suited For")
+
+    # Show strengths summary at the top
+    if st.session_state.strengths_summary:
+        st.markdown(f"""
+            <div class="strengths-banner">
+                <strong>🔑 Your Profile</strong><br>
+                {st.session_state.strengths_summary}
+            </div>
+        """, unsafe_allow_html=True)
+
     st.markdown(
-        "Select all the roles you'd like to explore — "
+        "Select the roles you'd like to explore — "
         "we'll find live jobs and rank them against your CV."
     )
 
@@ -466,7 +439,7 @@ def render_role_selection_stage() -> None:
     for role in roles:
         categories.setdefault(role["category"], []).append(role)
 
-    category_styles = {
+    category_config = {
         "Obvious Match": ("cat-obvious", "🎯 Obvious Matches", "Roles you're already fully qualified for"),
         "Stretch Role":  ("cat-stretch", "🚀 Stretch Roles",   "Roles within reach with minor upskilling"),
         "Hidden Gem":    ("cat-hidden",  "💎 Hidden Gems",      "Surprising roles your background suits well"),
@@ -474,13 +447,15 @@ def render_role_selection_stage() -> None:
 
     selected = list(st.session_state.selected_roles)
 
-    for cat_key, (css_class, cat_label, cat_desc) in category_styles.items():
+    for cat_key, (css_class, cat_label, cat_desc) in category_config.items():
         cat_roles = categories.get(cat_key, [])
         if not cat_roles:
             continue
+
         st.markdown(f"#### {cat_label}")
         st.caption(cat_desc)
         cols = st.columns(2)
+
         for idx, role in enumerate(cat_roles):
             with cols[idx % 2]:
                 checked = st.checkbox(
@@ -496,6 +471,7 @@ def render_role_selection_stage() -> None:
                         <div class="role-salary">💷 {role["salary"]}</div>
                     </div>
                 """, unsafe_allow_html=True)
+
                 if checked and role["title"] not in selected:
                     selected.append(role["title"])
                 elif not checked and role["title"] in selected:
@@ -533,12 +509,21 @@ def render_role_selection_stage() -> None:
             _run_job_search(selected)
 
 
-def _run_job_search(selected: list[str]) -> None:
+def _run_job_search(selected_roles: list[str]) -> None:
+    """
+    Fetch jobs for all selected roles, score them, and navigate to results.
+
+    Args:
+        selected_roles: List of role title strings chosen by the user
+    """
     all_jobs = []
     progress = st.progress(0, text="Searching live jobs...")
 
-    for i, role_title in enumerate(selected):
-        progress.progress(int((i / len(selected)) * 80), text=f"Searching: {role_title}...")
+    for i, role_title in enumerate(selected_roles):
+        progress.progress(
+            int((i / len(selected_roles)) * 80),
+            text=f"Searching: {role_title}...",
+        )
         try:
             jobs = fetch_jobs(
                 role_title,
@@ -550,16 +535,15 @@ def _run_job_search(selected: list[str]) -> None:
             logger.warning(f"Job fetch failed for '{role_title}': {e}")
 
     if not all_jobs:
-        st.warning("No jobs found. Try different roles or a different country.")
+        st.warning("No jobs found. Try selecting different roles or changing country.")
         progress.empty()
         return
 
     progress.progress(85, text="Scoring jobs against your CV...")
+
     try:
         scored = score_jobs(st.session_state.cv_text, all_jobs)
-        st.session_state.scored_jobs  = scored
-        st.session_state.analysis     = None
-        st.session_state.selected_job = None
+        st.session_state.scored_jobs = scored
     except Exception as e:
         st.error("Scoring failed. Please try again.")
         logger.error(f"Scoring error: {e}")
@@ -571,16 +555,25 @@ def _run_job_search(selected: list[str]) -> None:
 
 
 # ─────────────────────────────────────────────
-# SCREEN 3 — JOB RESULTS  (analysis inline)
+# SCREEN 3 — JOB RESULTS
 # ─────────────────────────────────────────────
 
 def render_job_card(job: dict, index: int) -> None:
-    score        = job.get("match_score", 0)
-    score_class  = get_score_class(score)
-    score_label  = get_score_label(score)
-    salary       = format_salary(job)
-    preview      = job.get("description", "")[:300] + "..."
-    source       = job.get("source", "")
+    """
+    Render a single scored job card with an inline collapsible AI analysis.
+
+    Args:
+        job: Scored job dictionary
+        index: Position index used for unique widget keys
+    """
+    score       = job.get("match_score", 0)
+    score_class = get_score_class(score)
+    score_label = get_score_label(score)
+    salary      = format_salary(job)
+    description = job.get("description", "")
+    preview     = description[:300] + ("..." if len(description) > 300 else "")
+    source      = job.get("source", "")
+
     source_colours = {
         "Adzuna":   "#2d8c72",
         "Reed":     "#0072c6",
@@ -588,6 +581,7 @@ def render_job_card(job: dict, index: int) -> None:
     }
     source_colour = source_colours.get(source, "#7a9e97")
 
+    # Job card HTML
     st.markdown(f"""
         <div class="job-card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
@@ -607,12 +601,17 @@ def render_job_card(job: dict, index: int) -> None:
         </div>
     """, unsafe_allow_html=True)
 
-    # Action row
-    col1, col2, col3 = st.columns([1, 1, 1])
-
+    # Action buttons
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.link_button("🔗 View Job", job.get("url", "#"), use_container_width=True)
-
+    with col2:
+        analysis_key = f"analysis_cache_{index}"
+        toggle_key   = f"show_analysis_{index}"
+        btn_label    = "🤖 Hide Analysis" if st.session_state.get(toggle_key) else "🤖 AI Analysis"
+        if st.button(btn_label, key=f"toggle_{index}", use_container_width=True):
+            st.session_state[toggle_key] = not st.session_state.get(toggle_key, False)
+            st.rerun()
     with col3:
         st.button(
             "✉️ Cover Letter",
@@ -622,19 +621,8 @@ def render_job_card(job: dict, index: int) -> None:
             help="Coming soon",
         )
 
-    # ── Inline AI analysis dropdown ──
-    with col2:
-        analysis_key = f"analysis_cache_{index}"
-        button_label = "🤖 View Analysis" if analysis_key in st.session_state else "🤖 AI Analysis"
-
-        if st.button(button_label, key=f"toggle_analysis_{index}", use_container_width=True):
-            # Toggle visibility flag
-            toggle_key = f"show_analysis_{index}"
-            st.session_state[toggle_key] = not st.session_state.get(toggle_key, False)
-
-    # Render the dropdown panel below the card if toggled open
-    toggle_key = f"show_analysis_{index}"
-    if st.session_state.get(toggle_key, False):
+    # Inline analysis panel — only shown when toggled open
+    if st.session_state.get(f"show_analysis_{index}", False):
         analysis_key = f"analysis_cache_{index}"
 
         if analysis_key not in st.session_state:
@@ -644,7 +632,8 @@ def render_job_card(job: dict, index: int) -> None:
                     st.session_state[analysis_key] = result
                 except Exception as e:
                     st.error(f"Analysis failed: {e}")
-                    st.session_state[toggle_key] = False
+                    st.session_state[f"show_analysis_{index}"] = False
+                    st.rerun()
 
         if analysis_key in st.session_state:
             st.markdown(f"""
@@ -652,30 +641,40 @@ def render_job_card(job: dict, index: int) -> None:
                     {st.session_state[analysis_key].replace(chr(10), "<br>")}
                 </div>
             """, unsafe_allow_html=True)
-            st.markdown("<br>", unsafe_allow_html=True)
+
+            if st.button("📋 Copy Analysis", key=f"copy_{index}", use_container_width=False):
+                st.code(st.session_state[analysis_key], language=None)
 
     st.markdown("---")
 
 
 def render_results_stage() -> None:
+    """Screen 3: Display all scored job results with filters and inline analysis."""
     st.markdown("### 💼 Your Live Job Matches")
     st.markdown(
         f"Found **{len(st.session_state.scored_jobs)} jobs** across "
         f"**{len(st.session_state.selected_roles)} role(s)**, ranked by CV match score."
     )
 
+    # Filters
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         min_score = st.slider("Minimum match score", 0, 100, 0, step=5)
     with col2:
         sort_order = st.selectbox("Sort by", ["Match Score", "Salary"])
     with col3:
-        role_filter = st.selectbox("Filter by role", ["All Roles"] + st.session_state.selected_roles)
+        role_filter = st.selectbox(
+            "Filter by role",
+            ["All Roles"] + st.session_state.selected_roles,
+        )
 
     filtered = [j for j in st.session_state.scored_jobs if j["match_score"] >= min_score]
 
     if role_filter != "All Roles":
-        filtered = [j for j in filtered if role_filter.lower() in j.get("title", "").lower()]
+        filtered = [
+            j for j in filtered
+            if role_filter.lower() in j.get("title", "").lower()
+        ]
 
     if sort_order == "Salary":
         filtered.sort(key=lambda x: x.get("salary_max") or 0, reverse=True)
@@ -692,10 +691,11 @@ def render_results_stage() -> None:
 
 
 # ─────────────────────────────────────────────
-# ENTRY POINT — single-screen router
+# ENTRY POINT
 # ─────────────────────────────────────────────
 
 def main() -> None:
+    """Main entry point — renders sidebar, header, breadcrumb, then active screen."""
     render_sidebar()
     render_header()
     render_breadcrumb()
