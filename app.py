@@ -1,7 +1,12 @@
 import streamlit as st
 import logging
 from utils.cv_parser import extract_cv_text
-from utils.job_fetcher import fetch_jobs
+from utils.job_fetcher import (
+    fetch_jobs,
+    geocode_postcode,
+    detect_location_from_ip,
+    LocationFilter,
+)
 from utils.scorer import score_jobs
 from utils.analyzer import analyse_match
 from utils.job_suggester import suggest_job_roles
@@ -41,79 +46,61 @@ st.markdown("""
         margin-bottom: 2rem;
         border: 1px solid #2d5a50;
     }
-    .main-header h1 {
-        color: #7dd3c0;
-        font-size: 2.6rem;
-        font-weight: 700;
-        margin: 0;
-        letter-spacing: -0.5px;
-    }
-    .main-header p {
-        color: #a8c5be;
-        font-size: 1rem;
-        margin-top: 0.5rem;
-        margin-bottom: 0;
-    }
+    .main-header h1 { color: #7dd3c0; font-size: 2.6rem; font-weight: 700; margin: 0; letter-spacing: -0.5px; }
+    .main-header p  { color: #a8c5be; font-size: 1rem; margin-top: 0.5rem; margin-bottom: 0; }
 
     /* ── Breadcrumb ── */
     .breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1.25rem;
-        background: #e4edeb;
-        border-radius: 10px;
-        margin-bottom: 1.5rem;
-        font-size: 0.875rem;
-        border: 1px solid #c8dbd7;
+        display: flex; align-items: center; gap: 0.5rem;
+        padding: 0.75rem 1.25rem; background: #e4edeb;
+        border-radius: 10px; margin-bottom: 1.5rem;
+        font-size: 0.875rem; border: 1px solid #c8dbd7;
     }
     .bc-step        { color: #7a9e97; font-weight: 500; }
     .bc-step.active { color: #1a6b5a; font-weight: 700; }
     .bc-step.done   { color: #2d8c72; font-weight: 500; }
     .bc-arrow       { color: #b0ccc7; font-size: 0.75rem; }
 
-    /* ── Strengths summary banner ── */
+    /* ── Location banners ── */
+    .location-ok {
+        background: #f0faf7; border: 1px solid #a8d5c8;
+        border-left: 4px solid #2d8c72; border-radius: 10px;
+        padding: 0.9rem 1.2rem; margin: 0.75rem 0;
+        font-size: 0.88rem; color: #1a3a34;
+    }
+    .location-ok .loc-label {
+        color: #1a6b5a; font-weight: 700;
+        font-size: 0.76rem; text-transform: uppercase;
+        letter-spacing: 0.5px; display: block; margin-bottom: 0.2rem;
+    }
+    .location-err {
+        background: #fef3e2; border: 1px solid #f5c842;
+        border-left: 4px solid #f5a623; border-radius: 10px;
+        padding: 0.9rem 1.2rem; margin: 0.75rem 0;
+        font-size: 0.88rem; color: #6b4c00;
+    }
+
+    /* ── Strengths banner ── */
     .strengths-banner {
-        background: #f0faf7;
-        border: 1px solid #a8d5c8;
-        border-left: 4px solid #2d8c72;
-        border-radius: 10px;
-        padding: 1.2rem 1.5rem;
-        margin-bottom: 1.5rem;
-        color: #1a3a34;
-        font-size: 0.93rem;
-        line-height: 1.7;
+        background: #f0faf7; border: 1px solid #a8d5c8;
+        border-left: 4px solid #2d8c72; border-radius: 10px;
+        padding: 1.2rem 1.5rem; margin-bottom: 1.5rem;
+        color: #1a3a34; font-size: 0.93rem; line-height: 1.7;
     }
-    .strengths-banner strong {
-        color: #1a6b5a;
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-    }
+    .strengths-banner strong { color: #1a6b5a; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.6px; }
 
     /* ── Role cards ── */
     .role-card {
-        background: #ffffff;
-        border: 1.5px solid #c8dbd7;
-        border-radius: 12px;
-        padding: 1.2rem 1.5rem;
-        margin-top: 0.4rem;
-        margin-bottom: 0.8rem;
+        background: #ffffff; border: 1.5px solid #c8dbd7;
+        border-radius: 12px; padding: 1.2rem 1.5rem;
+        margin-top: 0.4rem; margin-bottom: 0.8rem;
         transition: border-color 0.2s ease;
     }
-    .role-card-selected {
-        border-color: #2d8c72 !important;
-        background: #f0faf7 !important;
-    }
+    .role-card-selected { border-color: #2d8c72 !important; background: #f0faf7 !important; }
     .role-category-badge {
-        display: inline-block;
-        padding: 0.2rem 0.7rem;
-        border-radius: 20px;
-        font-size: 0.7rem;
-        font-weight: 700;
-        letter-spacing: 0.6px;
-        text-transform: uppercase;
-        margin-bottom: 0.5rem;
+        display: inline-block; padding: 0.2rem 0.7rem;
+        border-radius: 20px; font-size: 0.7rem; font-weight: 700;
+        letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 0.5rem;
     }
     .cat-obvious { background: #dff0eb; color: #1a6b5a; }
     .cat-stretch { background: #e8e4f7; color: #5a3da8; }
@@ -124,17 +111,11 @@ st.markdown("""
 
     /* ── Job cards ── */
     .job-card {
-        background: #ffffff;
-        border: 1px solid #c8dbd7;
-        border-radius: 14px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
+        background: #ffffff; border: 1px solid #c8dbd7;
+        border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem;
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
-    .job-card:hover {
-        border-color: #2d8c72;
-        box-shadow: 0 4px 20px rgba(45,140,114,0.1);
-    }
+    .job-card:hover { border-color: #2d8c72; box-shadow: 0 4px 20px rgba(45,140,114,0.1); }
     .job-title       { color: #1a3a34; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem; }
     .job-meta        { color: #5a7b74; font-size: 0.85rem; margin-bottom: 0.8rem; }
     .job-description { color: #3a5a54; font-size: 0.9rem; line-height: 1.6; }
@@ -143,23 +124,13 @@ st.markdown("""
     .score-high   { background: #dff0eb; color: #1a6b5a; }
     .score-medium { background: #fef3e2; color: #9a6000; }
     .score-low    { background: #fde8e8; color: #9a2020; }
-
-    .salary-badge {
-        background: #e4edeb; color: #2d6b5a;
-        padding: 0.2rem 0.7rem; border-radius: 20px;
-        font-size: 0.78rem; font-weight: 600; margin-left: 0.5rem;
-    }
+    .salary-badge { background: #e4edeb; color: #2d6b5a; padding: 0.2rem 0.7rem; border-radius: 20px; font-size: 0.78rem; font-weight: 600; margin-left: 0.5rem; }
 
     /* ── Analysis box ── */
     .analysis-box {
-        background: #f5fbf9;
-        border-left: 4px solid #2d8c72;
-        border-radius: 0 10px 10px 0;
-        padding: 1.5rem;
-        color: #1a3a34;
-        font-size: 0.93rem;
-        line-height: 1.9;
-        margin-top: 0.5rem;
+        background: #f5fbf9; border-left: 4px solid #2d8c72;
+        border-radius: 0 10px 10px 0; padding: 1.5rem;
+        color: #1a3a34; font-size: 0.93rem; line-height: 1.9; margin-top: 0.5rem;
     }
 
     /* ── Sidebar ── */
@@ -170,10 +141,9 @@ st.markdown("""
     }
     .step-complete { background: #dff0eb; color: #1a6b5a; }
     .step-pending  { background: #eef3f2; color: #8aada7; }
-
-    .stat-card     { background: #ffffff; border: 1px solid #c8dbd7; border-radius: 10px; padding: 1rem; text-align: center; margin-bottom: 0.5rem; }
-    .stat-number   { font-size: 1.8rem; font-weight: 800; color: #2d8c72; }
-    .stat-label    { font-size: 0.78rem; color: #6a9b94; margin-top: 0.2rem; }
+    .stat-card   { background: #ffffff; border: 1px solid #c8dbd7; border-radius: 10px; padding: 1rem; text-align: center; margin-bottom: 0.5rem; }
+    .stat-number { font-size: 1.8rem; font-weight: 800; color: #2d8c72; }
+    .stat-label  { font-size: 0.78rem; color: #6a9b94; margin-top: 0.2rem; }
 
     /* ── Empty state ── */
     .empty-state       { text-align: center; padding: 3rem 1rem; color: #7a9e97; font-size: 1rem; }
@@ -192,7 +162,7 @@ st.markdown("""
 
 def initialise_session_state() -> None:
     """Initialise all session state variables on first run."""
-    defaults = {
+    defaults: dict = {
         "cv_text":           None,
         "parsed_roles":      [],
         "strengths_summary": "",
@@ -201,6 +171,12 @@ def initialise_session_state() -> None:
         "app_stage":         "upload",
         "search_country":    "gb",
         "results_per_role":  5,
+        "include_remote":    True,
+        # Location
+        "location_filter":   None,   # LocationFilter | None
+        "postcode_input":    "",     # raw text in the input box
+        "location_status":   "",     # "ok" | "error" | ""
+        "location_message":  "",     # human-readable message
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -223,20 +199,17 @@ STAGE_LABELS = {
 
 
 def go_to(stage: str) -> None:
-    """Navigate to a specific stage and trigger a rerun."""
     st.session_state.app_stage = stage
     st.rerun()
 
 
 def go_back() -> None:
-    """Navigate to the previous stage."""
     idx = STAGES.index(st.session_state.app_stage)
     if idx > 0:
         go_to(STAGES[idx - 1])
 
 
 def render_breadcrumb() -> None:
-    """Render a breadcrumb bar showing current position in the flow."""
     current       = st.session_state.app_stage
     current_index = STAGES.index(current) if current in STAGES else len(STAGES)
     parts         = []
@@ -267,21 +240,18 @@ def render_breadcrumb() -> None:
 # ─────────────────────────────────────────────
 
 def get_score_class(score: float) -> str:
-    """Return CSS class based on match score threshold."""
     if score >= 70: return "score-high"
     if score >= 45: return "score-medium"
     return "score-low"
 
 
 def get_score_label(score: float) -> str:
-    """Return human-readable label based on match score."""
     if score >= 70: return "Strong Match"
     if score >= 45: return "Partial Match"
     return "Weak Match"
 
 
 def format_salary(job: dict) -> str:
-    """Format salary range string from job dictionary."""
     lo, hi = job.get("salary_min"), job.get("salary_max")
     if lo and hi: return f"£{int(lo):,} – £{int(hi):,}"
     if lo:        return f"From £{int(lo):,}"
@@ -290,15 +260,172 @@ def format_salary(job: dict) -> str:
 
 
 # ─────────────────────────────────────────────
+# LOCATION HELPERS
+# ─────────────────────────────────────────────
+
+def _apply_postcode(postcode: str) -> None:
+    """Geocode postcode and store result in session state."""
+    with st.spinner("📍 Looking up postcode..."):
+        loc = geocode_postcode(postcode)
+
+    if loc:
+        st.session_state.location_filter  = loc
+        st.session_state.location_status  = "ok"
+        st.session_state.location_message = (
+            f"Filtering jobs near **{loc.display}** "
+            f"within **{loc.radius_km} km**"
+        )
+        logger.info(f"Postcode resolved: {loc}")
+    else:
+        st.session_state.location_filter  = None
+        st.session_state.location_status  = "error"
+        st.session_state.location_message = (
+            f"Could not find postcode **{postcode.strip().upper()}**. "
+            "Check the postcode and try again, or leave blank to search nationwide."
+        )
+
+
+def _apply_ip_location() -> None:
+    """Detect location from IP and store result in session state."""
+    with st.spinner("🌐 Detecting your location..."):
+        loc = detect_location_from_ip()
+
+    if loc:
+        st.session_state.location_filter  = loc
+        st.session_state.location_status  = "ok"
+        st.session_state.location_message = (
+            f"Location detected as **{loc.display}** *(approximate)* — "
+            f"within **{loc.radius_km} km**"
+        )
+        logger.info(f"IP location detected: {loc}")
+    else:
+        st.session_state.location_filter  = None
+        st.session_state.location_status  = "error"
+        st.session_state.location_message = (
+            "Could not detect your location automatically. "
+            "Enter a postcode manually, or leave blank to search nationwide."
+        )
+
+
+def _clear_location() -> None:
+    """Remove any active location filter from session state."""
+    st.session_state.location_filter  = None
+    st.session_state.location_status  = ""
+    st.session_state.location_message = ""
+    st.session_state.postcode_input   = ""
+
+
+# ─────────────────────────────────────────────
+# LOCATION UI
+# ─────────────────────────────────────────────
+
+def render_location_section() -> None:
+    """
+    Render the location filtering panel inside the role selection screen.
+
+    Provides:
+      - UK postcode input + Apply button  (uses postcodes.io)
+      - "Use my location" button          (uses ip-api.com as fallback)
+      - Radius slider when a location is active
+      - Clear button to remove any filter
+      - Status banner (success or error)
+    """
+    st.markdown("#### 📍 Location Filter *(optional)*")
+    st.caption(
+        "Narrow results to jobs near you. Leave blank to search nationwide. "
+        "Remote jobs from Remotive are always included regardless."
+    )
+
+    col_input, col_apply, col_ip, col_clear = st.columns([3, 1.1, 1.8, 1])
+
+    with col_input:
+        postcode_val = st.text_input(
+            "UK postcode",
+            value=st.session_state.postcode_input,
+            placeholder="e.g. M1 1AE  or  SW1A 2AA",
+            label_visibility="collapsed",
+            key="postcode_text_input",
+        )
+        st.session_state.postcode_input = postcode_val
+
+    with col_apply:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Apply", use_container_width=True, key="btn_apply_postcode"):
+            if postcode_val.strip():
+                _apply_postcode(postcode_val)
+            else:
+                _clear_location()
+
+    with col_ip:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button(
+            "🌐 Use my location",
+            use_container_width=True,
+            key="btn_ip_location",
+            help="Approximate detection based on your internet connection.",
+        ):
+            _apply_ip_location()
+
+    with col_clear:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("✕ Clear", use_container_width=True, key="btn_clear_location"):
+            _clear_location()
+
+    # ── Radius slider — only visible when a location is active ──
+    loc: LocationFilter | None = st.session_state.get("location_filter")
+    if loc and st.session_state.location_status == "ok":
+        radius_col, _ = st.columns([2, 3])
+        with radius_col:
+            new_radius = st.slider(
+                "Search radius (km)",
+                min_value=5,
+                max_value=150,
+                value=loc.radius_km,
+                step=5,
+                key="radius_slider",
+                help="Applies to Adzuna and Reed. Remote jobs ignore this.",
+            )
+            if new_radius != loc.radius_km:
+                loc.radius_km = new_radius
+                st.session_state.location_filter = loc
+
+    # ── Status banner ──
+    status  = st.session_state.get("location_status", "")
+    message = st.session_state.get("location_message", "")
+
+    if status == "ok" and message:
+        st.markdown(
+            f'<div class="location-ok">'
+            f'<span class="loc-label">📍 Active Location Filter</span>'
+            f'{message}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    elif status == "error" and message:
+        st.markdown(
+            f'<div class="location-err">⚠️ {message}</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+
+
+# ─────────────────────────────────────────────
 # SIDEBAR
 # ─────────────────────────────────────────────
 
 def render_sidebar() -> None:
-    """Render sidebar with progress tracker and live stats."""
     with st.sidebar:
         st.markdown("## 🎯 CV Job Matcher")
         st.markdown("*AI-powered career guidance*")
         st.markdown("---")
+
+        # Show active location
+        loc: LocationFilter | None = st.session_state.get("location_filter")
+        if loc:
+            st.markdown(f"📍 **Location:** {loc.display}")
+            st.markdown(f"*Radius: {loc.radius_km} km*")
+            st.markdown("---")
 
         st.markdown("### Progress")
         steps = [
@@ -325,7 +452,7 @@ def render_sidebar() -> None:
             with c2:
                 st.markdown(f'<div class="stat-card"><div class="stat-number">{strong}</div><div class="stat-label">Strong Matches</div></div>', unsafe_allow_html=True)
             st.markdown(f'<div class="stat-card"><div class="stat-number">{max(scores)}%</div><div class="stat-label">Top Score</div></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="stat-card"><div class="stat-number">{round(sum(scores)/len(scores),1)}%</div><div class="stat-label">Avg Score</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="stat-card"><div class="stat-number">{round(sum(scores)/len(scores), 1)}%</div><div class="stat-label">Avg Score</div></div>', unsafe_allow_html=True)
 
         st.markdown("---")
         if st.button("🔄 Start Over", use_container_width=True):
@@ -338,7 +465,6 @@ def render_sidebar() -> None:
 # ─────────────────────────────────────────────
 
 def render_header() -> None:
-    """Render the branded page header."""
     st.markdown("""
         <div class="main-header">
             <h1>🎯 CV Job Matcher</h1>
@@ -372,7 +498,6 @@ def render_upload_stage() -> None:
         """, unsafe_allow_html=True)
         return
 
-    # Extract CV text
     with st.spinner("📖 Reading your CV..."):
         try:
             cv_text = extract_cv_text(uploaded_file)
@@ -391,17 +516,13 @@ def render_upload_stage() -> None:
     st.session_state.cv_text = cv_text
     st.success(f"✅ CV uploaded — {len(cv_text.split()):,} words extracted.")
 
-    # Auto-generate role suggestions
     with st.spinner("🤖 Analysing your CV and identifying matching roles..."):
         try:
             roles, summary = suggest_job_roles(cv_text)
             st.session_state.parsed_roles      = roles
             st.session_state.strengths_summary = summary
             logger.info(f"Parsed {len(roles)} roles successfully.")
-        except ValueError as e:
-            st.error(str(e))
-            return
-        except RuntimeError as e:
+        except (ValueError, RuntimeError) as e:
             st.error(str(e))
             return
         except Exception as e:
@@ -417,10 +538,9 @@ def render_upload_stage() -> None:
 # ─────────────────────────────────────────────
 
 def render_role_selection_stage() -> None:
-    """Screen 2: Display AI-suggested roles. User selects which to explore."""
+    """Screen 2: Display AI-suggested roles, location filter, and search options."""
     st.markdown("### 💡 Roles You're Suited For")
 
-    # Show strengths summary at the top
     if st.session_state.strengths_summary:
         st.markdown(f"""
             <div class="strengths-banner">
@@ -434,8 +554,9 @@ def render_role_selection_stage() -> None:
         "we'll find live jobs and rank them against your CV."
     )
 
+    # ── Role cards ──
     roles      = st.session_state.parsed_roles
-    categories = {}
+    categories: dict[str, list[dict]] = {}
     for role in roles:
         categories.setdefault(role["category"], []).append(role)
 
@@ -480,13 +601,17 @@ def render_role_selection_stage() -> None:
     st.session_state.selected_roles = selected
     st.markdown("---")
 
+    # ── Location filter ──
+    render_location_section()
+
+    # ── Search options ──
     if not selected:
         st.info("☝️ Select at least one role above to continue.")
         return
 
     st.success(f"✅ {len(selected)} role(s) selected: {', '.join(selected)}")
 
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
     with col1:
         st.session_state.search_country = st.selectbox(
             "Country",
@@ -504,6 +629,12 @@ def render_role_selection_stage() -> None:
             index=[3, 5, 10].index(st.session_state.results_per_role),
         )
     with col3:
+        st.session_state.include_remote = st.checkbox(
+            "Include remote",
+            value=st.session_state.include_remote,
+            help="Include remote jobs from Remotive (location filter does not apply to these).",
+        )
+    with col4:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔍 Find My Jobs", use_container_width=True, type="primary"):
             _run_job_search(selected)
@@ -511,12 +642,16 @@ def render_role_selection_stage() -> None:
 
 def _run_job_search(selected_roles: list[str]) -> None:
     """
-    Fetch jobs for all selected roles, score them, and navigate to results.
+    Fetch, score, and store jobs for all selected roles then navigate to results.
+
+    Passes the active LocationFilter (if any) through to fetch_jobs so that
+    Adzuna and Reed results are geographically filtered.
 
     Args:
         selected_roles: List of role title strings chosen by the user
     """
-    all_jobs = []
+    location: LocationFilter | None = st.session_state.get("location_filter")
+    all_jobs: list[dict]            = []
     progress = st.progress(0, text="Searching live jobs...")
 
     for i, role_title in enumerate(selected_roles):
@@ -526,16 +661,18 @@ def _run_job_search(selected_roles: list[str]) -> None:
         )
         try:
             jobs = fetch_jobs(
-                role_title,
-                country=st.session_state.search_country,
-                results_per_page=st.session_state.results_per_role,
+                keywords         = role_title,
+                country          = st.session_state.search_country,
+                results_per_page = st.session_state.results_per_role,
+                include_remote   = st.session_state.include_remote,
+                location         = location,
             )
             all_jobs.extend(jobs)
         except Exception as e:
             logger.warning(f"Job fetch failed for '{role_title}': {e}")
 
     if not all_jobs:
-        st.warning("No jobs found. Try selecting different roles or changing country.")
+        st.warning("No jobs found. Try selecting different roles, changing country, or widening your search radius.")
         progress.empty()
         return
 
@@ -560,10 +697,10 @@ def _run_job_search(selected_roles: list[str]) -> None:
 
 def render_job_card(job: dict, index: int) -> None:
     """
-    Render a single scored job card with an inline collapsible AI analysis.
+    Render a single scored job card with collapsible AI analysis.
 
     Args:
-        job: Scored job dictionary
+        job:   Scored job dictionary
         index: Position index used for unique widget keys
     """
     score       = job.get("match_score", 0)
@@ -581,7 +718,6 @@ def render_job_card(job: dict, index: int) -> None:
     }
     source_colour = source_colours.get(source, "#7a9e97")
 
-    # Job card HTML
     st.markdown(f"""
         <div class="job-card">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;">
@@ -601,14 +737,12 @@ def render_job_card(job: dict, index: int) -> None:
         </div>
     """, unsafe_allow_html=True)
 
-    # Action buttons
     col1, col2, col3 = st.columns(3)
     with col1:
         st.link_button("🔗 View Job", job.get("url", "#"), use_container_width=True)
     with col2:
-        analysis_key = f"analysis_cache_{index}"
-        toggle_key   = f"show_analysis_{index}"
-        btn_label    = "🤖 Hide Analysis" if st.session_state.get(toggle_key) else "🤖 AI Analysis"
+        toggle_key = f"show_analysis_{index}"
+        btn_label  = "🤖 Hide Analysis" if st.session_state.get(toggle_key) else "🤖 AI Analysis"
         if st.button(btn_label, key=f"toggle_{index}", use_container_width=True):
             st.session_state[toggle_key] = not st.session_state.get(toggle_key, False)
             st.rerun()
@@ -621,7 +755,6 @@ def render_job_card(job: dict, index: int) -> None:
             help="Coming soon",
         )
 
-    # Inline analysis panel — only shown when toggled open
     if st.session_state.get(f"show_analysis_{index}", False):
         analysis_key = f"analysis_cache_{index}"
 
@@ -642,7 +775,7 @@ def render_job_card(job: dict, index: int) -> None:
                 </div>
             """, unsafe_allow_html=True)
 
-            if st.button("📋 Copy Analysis", key=f"copy_{index}", use_container_width=False):
+            if st.button("📋 Copy Analysis", key=f"copy_{index}"):
                 st.code(st.session_state[analysis_key], language=None)
 
     st.markdown("---")
@@ -650,13 +783,15 @@ def render_job_card(job: dict, index: int) -> None:
 
 def render_results_stage() -> None:
     """Screen 3: Display all scored job results with filters and inline analysis."""
-    st.markdown("### 💼 Your Live Job Matches")
+    loc: LocationFilter | None = st.session_state.get("location_filter")
+
+    header_suffix = f" near **{loc.display}**" if loc else ""
+    st.markdown(f"### 💼 Your Live Job Matches{header_suffix}")
     st.markdown(
         f"Found **{len(st.session_state.scored_jobs)} jobs** across "
         f"**{len(st.session_state.selected_roles)} role(s)**, ranked by CV match score."
     )
 
-    # Filters
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         min_score = st.slider("Minimum match score", 0, 100, 0, step=5)
@@ -695,7 +830,6 @@ def render_results_stage() -> None:
 # ─────────────────────────────────────────────
 
 def main() -> None:
-    """Main entry point — renders sidebar, header, breadcrumb, then active screen."""
     render_sidebar()
     render_header()
     render_breadcrumb()
