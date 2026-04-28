@@ -7,3 +7,4 @@ requests
 groq
 python-dotenv
 torch
+torchvision
