@@ -1,5 +1,6 @@
 import logging
 import os
+import streamlit as st
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -8,7 +9,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 MAX_TOKENS   = 350  # Hard ceiling — keeps responses tight
 TEMPERATURE  = 0.5  # Lower = more consistent, less waffle
 

@@ -1,6 +1,7 @@
 import requests
 import logging
 import os
+import streamlit as st
 from dataclasses import dataclass, field
 from typing import Optional
 from dotenv import load_dotenv
@@ -11,12 +12,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ── Adzuna ──
-ADZUNA_APP_ID   = os.getenv("ADZUNA_APP_ID")
-ADZUNA_APP_KEY  = os.getenv("ADZUNA_APP_KEY")
+ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID") or st.secrets.get("ADZUNA_APP_ID")
+ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY") or st.secrets.get("ADZUNA_APP_KEY")
 ADZUNA_BASE_URL = "https://api.adzuna.com/v1/api/jobs"
 
 # ── Reed ──
-REED_API_KEY  = os.getenv("REED_API_KEY")
+REED_API_KEY = os.getenv("REED_API_KEY") or st.secrets.get("REED_API_KEY")
 REED_BASE_URL = "https://www.reed.co.uk/api/1.0/search"
 
 # ── Remotive (no key needed) ──
