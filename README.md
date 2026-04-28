@@ -4,6 +4,8 @@ An AI-powered job matching platform that analyses your CV, recommends tailored c
 
 Built with **Streamlit, Python, and AI-driven analysis**, this tool helps you identify high-fit opportunities faster and make smarter career decisions.
 
+### 🌐 Try the Live App
+[![Live Demo](https://img.shields.io/badge/Live-Demo-green?style=for-the-badge)](https://danielakbank-cv-job-matcher-app-xacssg.streamlit.app/)
 ---
 
 ## 🚀 Key Features
